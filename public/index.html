@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proxy Checker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root, [data-theme="dark"] {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242735;
+    --border: #2e3244;
+    --text: #e1e4ed;
+    --text-dim: #8b8fa3;
+    --accent: #6c5ce7;
+    --accent-hover: #7f71ef;
+    --green: #00d26a;
+    --red: #ff6b6b;
+    --yellow: #ffc048;
+    --blue: #54a0ff;
+    --radius: 8px;
+    --fav-row-bg: rgba(108, 92, 231, 0.06);
+    --shadow: none;
+  }
+
+  [data-theme="light"] {
+    --bg: #f0f2f5;
+    --surface: #ffffff;
+    --surface2: #f0f2f5;
+    --border: #d9dce3;
+    --text: #1a1d27;
+    --text-dim: #5f6578;
+    --accent: #6c5ce7;
+    --accent-hover: #5a4bd1;
+    --green: #00a854;
+    --red: #e74c3c;
+    --yellow: #e6a200;
+    --blue: #2f80ed;
+    --fav-row-bg: rgba(108, 92, 231, 0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; position: relative; }
+
+  header { text-align: center; margin-bottom: 24px; }
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--text-dim); font-size: 0.85rem; margin-top: 4px; }
+  .kbd-hint { color: var(--text-dim); font-size: 0.72rem; margin-top: 6px; }
+  .kbd-hint kbd {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 3px;
+    padding: 1px 5px; font-family: inherit; font-size: 0.7rem;
+  }
+
+  /* ── Stats Dashboard ─────────────────────────────────── */
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .stat-card .stat-label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  .stat-checked .stat-value { color: var(--blue); }
+  .stat-working .stat-value { color: var(--green); }
+  .stat-rate .stat-value { color: var(--yellow); }
+  .stat-fastest .stat-value { color: var(--accent); }
+  .stat-p50 .stat-value { color: var(--yellow); }
+  .stat-p95 .stat-value { color: var(--red); }
+
+  /* ── Controls Panel ──────────────────────────────────── */
+
+  .controls {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label {
+    font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: 0.5px; font-weight: 600;
+  }
+
+  .field select, .field input[type="number"], .field input[type="text"] {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 10px; font-size: 0.85rem;
+    outline: none; transition: border-color 0.2s;
+  }
+
+  .field select:focus, .field input:focus { border-color: var(--accent); }
+
+  .field-check {
+    display: flex; align-items: center; gap: 8px; align-self: end; padding-bottom: 4px;
+  }
+
+  .field-check input[type="checkbox"] {
+    width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer;
+  }
+
+  .field-check label { font-size: 0.85rem; cursor: pointer; }
+
+  .btn-row { display: flex; align-items: end; gap: 8px; }
+
+  .action-btn {
+    width: 100%; padding: 10px 20px; color: #fff; border: none; border-radius: 6px;
+    font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+
+  #scanBtn { background: var(--accent); }
+  #scanBtn:hover:not(:disabled) { background: var(--accent-hover); }
+  #scanBtn:active:not(:disabled) { transform: scale(0.97); }
+  #scanBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+  #scanBtn.scanning { background: var(--red); animation: pulse 1.2s ease-in-out infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+  /* ── Sources Panel ─────────────────────────────────────── */
+
+  .sources-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .sources-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    transition: background 0.15s;
+  }
+
+  .sources-header:hover { background: var(--surface2); }
+
+  .sources-header .sources-title {
+    font-size: 0.82rem; font-weight: 600; color: var(--text);
+  }
+
+  .sources-header .sources-arrow {
+    font-size: 0.7rem; color: var(--text-dim); transition: transform 0.2s;
+  }
+
+  .sources-panel.open .sources-arrow { transform: rotate(180deg); }
+
+  .sources-body {
+    display: none; padding: 0 16px 16px;
+  }
+
+  .sources-panel.open .sources-body { display: block; }
+
+  .sources-actions {
+    display: flex; gap: 8px; margin-bottom: 12px;
+  }
+
+  .source-group { margin-bottom: 10px; }
+  .source-group:last-child { margin-bottom: 0; }
+
+  .source-group-label {
+    font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: 0.5px; font-weight: 600; margin-bottom: 6px;
+  }
+
+  .source-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px 12px;
+  }
+
+  .source-check {
+    display: flex; align-items: center; gap: 6px; padding: 3px 0;
+  }
+
+  .source-check input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+  }
+
+  .source-check label {
+    font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+    transition: color 0.2s;
+  }
+
+  .source-check.source-ok label { color: var(--green); }
+  .source-check.source-fail label { color: var(--red); }
+  .source-check.source-fetching label { color: var(--text-dim); }
+
+  .source-spinner {
+    display: inline-block; width: 10px; height: 10px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%; margin-left: 4px;
+    animation: spin 0.8s linear infinite; vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .source-check .source-badge {
+    font-size: 0.65rem; font-weight: 600; margin-left: 4px;
+    padding: 1px 5px; border-radius: 3px;
+  }
+
+  .source-check.source-ok .source-badge {
+    background: rgba(0, 210, 106, 0.12); color: var(--green);
+  }
+
+  .source-check.source-fail .source-badge {
+    background: rgba(255, 107, 107, 0.12); color: var(--red);
+  }
+
+  /* ── Custom Proxy Paste Panel ──────────────────────────── */
+
+  .paste-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .paste-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    transition: background 0.15s;
+  }
+
+  .paste-header:hover { background: var(--surface2); }
+
+  .paste-header .paste-title {
+    font-size: 0.82rem; font-weight: 600; color: var(--text);
+  }
+
+  .paste-header .paste-arrow {
+    font-size: 0.7rem; color: var(--text-dim); transition: transform 0.2s;
+  }
+
+  .paste-panel.open .paste-arrow { transform: rotate(180deg); }
+
+  .paste-body { display: none; padding: 0 16px 16px; }
+  .paste-panel.open .paste-body { display: block; }
+
+  .paste-body textarea {
+    width: 100%; min-height: 100px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); padding: 10px; font-size: 0.82rem;
+    font-family: 'Consolas', 'Monaco', monospace; resize: vertical; outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .paste-body textarea:focus { border-color: var(--accent); }
+  .paste-body textarea::placeholder { color: var(--text-dim); }
+
+  .paste-actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+
+  .paste-actions .paste-count { font-size: 0.78rem; color: var(--text-dim); margin-left: auto; }
+
+  /* ── Status Bar ──────────────────────────────────────── */
+
+  .status-bar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 16px; margin-bottom: 16px; display: none;
+  }
+
+  .status-bar.visible { display: block; }
+
+  .status-text { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 8px; }
+
+  .progress-track { background: var(--surface2); border-radius: 4px; height: 6px; overflow: hidden; }
+
+  .progress-fill {
+    height: 100%; background: var(--accent); border-radius: 4px;
+    width: 0%; transition: width 0.3s ease;
+  }
+
+  .progress-fill.indeterminate {
+    width: 30%; animation: indeterminate 1.5s ease-in-out infinite;
+  }
+
+  @keyframes indeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+
+  /* ── Toolbar ─────────────────────────────────────────── */
+
+  .toolbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+  }
+
+  .toolbar .count { font-size: 0.85rem; color: var(--text-dim); }
+  .toolbar .count strong { color: var(--green); font-weight: 600; }
+
+  .toolbar-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 200px; }
+
+  .filter-input {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 6px 10px; font-size: 0.8rem; outline: none;
+    width: 180px; transition: border-color 0.2s;
+  }
+
+  .filter-input:focus { border-color: var(--accent); }
+  .filter-input::placeholder { color: var(--text-dim); }
+
+  .toolbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .btn-sm {
+    padding: 6px 14px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 0.78rem; font-weight: 500;
+    cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  }
+
+  .btn-sm:hover { background: var(--border); border-color: var(--text-dim); }
+  .btn-sm.active { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Table ───────────────────────────────────────────── */
+
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow-x: auto; box-shadow: var(--shadow);
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+
+  thead th {
+    background: var(--surface2); padding: 10px 14px; text-align: left;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-dim); font-weight: 600; cursor: pointer;
+    user-select: none; white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+
+  thead th:hover { color: var(--text); }
+  thead th:last-child, thead th:nth-last-child(2) { cursor: default; }
+  thead th .sort-arrow { margin-left: 4px; font-size: 0.65rem; }
+
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.fav-row { background: var(--fav-row-bg); }
+
+  tbody td { padding: 9px 14px; white-space: nowrap; }
+
+  /* Latency bar */
+  .latency-cell { display: flex; align-items: center; gap: 8px; }
+
+  .latency-bar {
+    width: 50px; height: 6px; background: var(--surface2); border-radius: 3px;
+    overflow: hidden; flex-shrink: 0;
+  }
+
+  .latency-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .latency-fast { color: var(--green); }
+  .latency-fast .latency-bar-fill { background: var(--green); }
+  .latency-mid { color: var(--yellow); }
+  .latency-mid .latency-bar-fill { background: var(--yellow); }
+  .latency-slow { color: var(--red); }
+  .latency-slow .latency-bar-fill { background: var(--red); }
+
+  .row-actions { display: flex; gap: 4px; }
+
+  .row-btn {
+    padding: 4px 8px; background: transparent; border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text-dim); font-size: 0.7rem;
+    cursor: pointer; transition: all 0.15s; line-height: 1;
+  }
+
+  .row-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .row-btn.copied { border-color: var(--green); color: var(--green); }
+  .row-btn.fav-active { border-color: var(--yellow); color: var(--yellow); }
+  .row-btn.rechecking { opacity: 0.5; pointer-events: none; }
+
+  .empty-state {
+    text-align: center; padding: 48px 16px; color: var(--text-dim); font-size: 0.9rem;
+  }
+
+  /* ── Load More ──────────────────────────────────────── */
+
+  .load-more-btn {
+    display: block; width: 100%; padding: 10px; margin-top: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text-dim); font-size: 0.82rem; font-weight: 500; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .load-more-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* ── Toast ───────────────────────────────────────────── */
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 10px 18px;
+    font-size: 0.82rem; color: var(--green); opacity: 0; transform: translateY(12px);
+    transition: all 0.25s; pointer-events: none; z-index: 100;
+  }
+
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Theme Toggle ─────────────────────────────────────── */
+
+  .theme-toggle {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.3s, border-color 0.3s;
+    display: flex;
+    align-items: center;
+  }
+
+  .theme-toggle .toggle-knob {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    margin-left: 3px;
+    transition: transform 0.3s, background 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  [data-theme="light"] .theme-toggle .toggle-knob {
+    transform: translateX(20px);
+    background: var(--accent);
+  }
+
+  /* ── Responsive ──────────────────────────────────────── */
+
+  @media (max-width: 700px) {
+    .controls { grid-template-columns: 1fr 1fr; }
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    header h1 { font-size: 1.3rem; }
+    .filter-input { width: 120px; }
+  }
+
+  @media (max-width: 480px) {
+    .stats { grid-template-columns: 1fr 1fr; }
+    .toolbar { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
+    <div class="toggle-knob" id="toggleKnob"></div>
+  </button>
+  <header>
+    <h1>Proxy <span>Checker</span></h1>
+    <p>Fetch &amp; validate free proxies in real-time</p>
+    <div class="kbd-hint">
+      <kbd>Enter</kbd> Scan &nbsp; <kbd>Esc</kbd> Stop &nbsp; <kbd>F</kbd> Filter &nbsp; <kbd>S</kbd> Sources &nbsp; <kbd>T</kbd> Theme
+    </div>
+  </header>
+
+  <!-- Stats Dashboard -->
+  <div class="stats">
+    <div class="stat-card stat-checked">
+      <div class="stat-value" id="statChecked">0</div>
+      <div class="stat-label">Checked</div>
+    </div>
+    <div class="stat-card stat-working">
+      <div class="stat-value" id="statWorking">0</div>
+      <div class="stat-label">Working</div>
+    </div>
+    <div class="stat-card stat-rate">
+      <div class="stat-value" id="statRate">0%</div>
+      <div class="stat-label">Success Rate</div>
+    </div>
+    <div class="stat-card stat-fastest">
+      <div class="stat-value" id="statFastest">--</div>
+      <div class="stat-label">Fastest</div>
+    </div>
+    <div class="stat-card stat-p50">
+      <div class="stat-value" id="statP50">--</div>
+      <div class="stat-label">P50 Latency</div>
+    </div>
+    <div class="stat-card stat-p95">
+      <div class="stat-value" id="statP95">--</div>
+      <div class="stat-label">P95 Latency</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="field">
+      <label for="type">Protocol</label>
+      <select id="type">
+        <option value="all">All</option>
+        <option value="http">HTTP</option>
+        <option value="https">HTTPS</option>
+        <option value="socks4">SOCKS4</option>
+        <option value="socks5">SOCKS5</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="testUrl">Test URL</label>
+      <select id="testUrl">
+        <option value="httpbin">httpbin.org/ip</option>
+        <option value="icanhazip">icanhazip.com</option>
+        <option value="google">google.com</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="timeout">Timeout (ms)</label>
+      <input type="number" id="timeout" value="5000" min="1000" max="30000" step="500">
+    </div>
+    <div class="field">
+      <label for="concurrency">Concurrency</label>
+      <input type="number" id="concurrency" value="50" min="1" max="200">
+    </div>
+    <div class="field">
+      <label for="limit">Limit</label>
+      <input type="number" id="limit" value="0" min="0" placeholder="0 = no limit">
+    </div>
+    <div class="field">
+      <label for="country">Country</label>
+      <input type="text" id="country" maxlength="2" placeholder="e.g. US">
+    </div>
+    <div class="field-check">
+      <input type="checkbox" id="anonymous">
+      <label for="anonymous">Anonymous only</label>
+    </div>
+    <div class="field-check">
+      <input type="checkbox" id="autoRefresh">
+      <label for="autoRefresh">Auto-refresh</label>
+    </div>
+    <div class="field" id="autoIntervalField" style="display:none">
+      <label for="autoInterval">Interval (min)</label>
+      <input type="number" id="autoInterval" value="5" min="1" max="60">
+    </div>
+    <div class="btn-row">
+      <button class="action-btn" id="scanBtn">Scan Proxies</button>
+    </div>
+  </div>
+
+  <!-- Sources -->
+  <div class="sources-panel" id="sourcesPanel">
+    <div class="sources-header" id="sourcesHeader">
+      <span class="sources-title" id="sourcesTitle">Sources (22/22)</span>
+      <span class="sources-arrow">&#9660;</span>
+    </div>
+    <div class="sources-body" id="sourcesBody"></div>
+  </div>
+
+  <!-- Custom Proxy Paste -->
+  <div class="paste-panel" id="pastePanel">
+    <div class="paste-header" id="pasteHeader">
+      <span class="paste-title">Test Custom Proxies</span>
+      <span class="paste-arrow">&#9660;</span>
+    </div>
+    <div class="paste-body">
+      <textarea id="pasteInput" placeholder="Paste ip:port list, one per line&#10;e.g. 1.2.3.4:8080&#10;     5.6.7.8:3128"></textarea>
+      <div class="paste-actions">
+        <button class="btn-sm" id="pasteTestBtn">Test Proxies</button>
+        <button class="btn-sm" id="pasteClearBtn">Clear</button>
+        <span class="paste-count" id="pasteCount"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar">
+    <div class="status-text" id="statusText">Initializing...</div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="count" id="proxyCount">No proxies yet</div>
+      <input type="text" class="filter-input" id="filterInput" placeholder="Filter results...">
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn-sm" id="favToggle">Favorites</button>
+      <button class="btn-sm" id="copyAllBtn">Copy All</button>
+      <button class="btn-sm" id="exportBtn">Export CSV</button>
+      <button class="btn-sm" id="exportJsonBtn">Export JSON</button>
+      <button class="btn-sm" id="exportTxtBtn">Export TXT</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-col="ip">IP <span class="sort-arrow"></span></th>
+          <th data-col="port">Port <span class="sort-arrow"></span></th>
+          <th data-col="type">Type <span class="sort-arrow"></span></th>
+          <th data-col="latency">Latency <span class="sort-arrow"></span></th>
+          <th data-col="country">Country <span class="sort-arrow"></span></th>
+          <th data-col="anonymity">Anon <span class="sort-arrow"></span></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="proxyBody">
+        <tr><td colspan="7" class="empty-state">Click <strong>Scan Proxies</strong> or press <strong>Enter</strong> to begin</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <button class="load-more-btn" id="loadMoreBtn" style="display:none">Load More</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const scanBtn = $("#scanBtn");
+  const statusBar = $("#statusBar");
+  const statusText = $("#statusText");
+  const progressFill = $("#progressFill");
+  const proxyBody = $("#proxyBody");
+  const proxyCount = $("#proxyCount");
+  const copyAllBtn = $("#copyAllBtn");
+  const exportBtn = $("#exportBtn");
+  const favToggle = $("#favToggle");
+  const filterInput = $("#filterInput");
+  const toastEl = $("#toast");
+  const autoRefreshCb = $("#autoRefresh");
+  const autoIntervalField = $("#autoIntervalField");
+  const autoIntervalInput = $("#autoInterval");
+
+  // Stat elements
+  const statChecked = $("#statChecked");
+  const statWorking = $("#statWorking");
+  const statRate = $("#statRate");
+  const statFastest = $("#statFastest");
+
+  // ── Theme Toggle ──
+
+  const themeToggle = $("#themeToggle");
+  const toggleKnob = $("#toggleKnob");
+
+  function getTheme() {
+    return localStorage.getItem("proxy_theme") || "dark";
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    toggleKnob.textContent = theme === "dark" ? "\u{1F319}" : "\u{2600}\u{FE0F}";
+    localStorage.setItem("proxy_theme", theme);
+  }
+
+  applyTheme(getTheme());
+
+  themeToggle.addEventListener("click", () => {
+    applyTheme(getTheme() === "dark" ? "light" : "dark");
+  });
+
+  const PAGE_SIZE = 100;
+  let pageSize = PAGE_SIZE;
+  let proxies = [];
+  let eventSource = null;
+  let sortCol = "latency";
+  let sortAsc = true;
+  let showFavsOnly = false;
+  let filterText = "";
+  let autoRefreshTimer = null;
+  let scanStats = { checked: 0, total: 0 };
+  let scanDone = false;
+  const loadMoreBtn = $("#loadMoreBtn");
+
+  // ── Favorites (localStorage) ──
+
+  function getFavs() {
+    try { return JSON.parse(localStorage.getItem("proxy_favs") || "{}"); } catch { return {}; }
+  }
+
+  function safeSave(key, value) {
+    try {
+      localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+    } catch (e) {
+      if (e.name === "QuotaExceededError") showToast("Storage full. Data not saved.");
+    }
+  }
+
+  function saveFavs(favs) {
+    safeSave("proxy_favs", favs);
+  }
+
+  function isFav(ip, port) {
+    return !!getFavs()[`${ip}:${port}`];
+  }
+
+  function toggleFav(ip, port, proxyData) {
+    const favs = getFavs();
+    const key = `${ip}:${port}`;
+    if (favs[key]) { delete favs[key]; }
+    else { favs[key] = proxyData; }
+    saveFavs(favs);
+  }
+
+  // ── History (localStorage) ──
+
+  function getScanHistory() {
+    try { return JSON.parse(localStorage.getItem("proxy_scan_history") || "[]"); } catch { return []; }
+  }
+
+  function saveHistory(proxyList) {
+    safeSave("proxy_history", {
+      timestamp: Date.now(),
+      proxies: proxyList.slice(0, 500),
+    });
+    const history = getScanHistory();
+    history.unshift({
+      timestamp: Date.now(),
+      count: proxyList.length,
+      rate: scanStats.checked > 0 ? Math.round((proxyList.length / scanStats.checked) * 100) : 0,
+      checked: scanStats.checked,
+      fastest: proxyList.length > 0 ? Math.min(...proxyList.map(p => p.latency)) : null,
+    });
+    safeSave("proxy_scan_history", history.slice(0, 5));
+  }
+
+  function loadHistory() {
+    try {
+      const h = JSON.parse(localStorage.getItem("proxy_history") || "null");
+      return h?.proxies || [];
+    } catch { return []; }
+  }
+
+  // ── Sound Notification ──
+
+  function playDoneSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.value = 0.08;
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15 + i * 0.12 + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.12);
+        osc.stop(ctx.currentTime + i * 0.12 + 0.4);
+      });
+    } catch { /* audio not supported */ }
+  }
+
+  // ── Toast ──
+
+  let toastTimer;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2000);
+  }
+
+  // ── Stats ──
+
+  const statP50 = $("#statP50");
+  const statP95 = $("#statP95");
+
+  function percentile(sorted, p) {
+    const idx = Math.ceil((p / 100) * sorted.length) - 1;
+    return sorted[Math.max(0, idx)];
+  }
+
+  function updateStats() {
+    const working = proxies.length;
+    const checked = scanStats.checked;
+    statChecked.textContent = checked;
+    statWorking.textContent = working;
+    statRate.textContent = checked > 0 ? Math.round((working / checked) * 100) + "%" : "0%";
+    if (working > 0) {
+      const latencies = proxies.map((p) => p.latency).sort((a, b) => a - b);
+      statFastest.textContent = latencies[0] + "ms";
+      statP50.textContent = percentile(latencies, 50) + "ms";
+      statP95.textContent = percentile(latencies, 95) + "ms";
+    } else {
+      statFastest.textContent = "--";
+      statP50.textContent = "--";
+      statP95.textContent = "--";
+    }
+  }
+
+  // ── Sorting ──
+
+  function compareValues(a, b, col) {
+    const va = a[col], vb = b[col];
+    if (col === "port" || col === "latency") return (va || 0) - (vb || 0);
+    return String(va || "").localeCompare(String(vb || ""));
+  }
+
+  function sortProxies() {
+    proxies.sort((a, b) => {
+      const c = compareValues(a, b, sortCol);
+      return sortAsc ? c : -c;
+    });
+  }
+
+  document.querySelectorAll("thead th[data-col]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const col = th.dataset.col;
+      if (sortCol === col) { sortAsc = !sortAsc; }
+      else { sortCol = col; sortAsc = true; }
+      document.querySelectorAll("thead th .sort-arrow").forEach((s) => (s.textContent = ""));
+      th.querySelector(".sort-arrow").textContent = sortAsc ? "\u25B2" : "\u25BC";
+      sortProxies();
+      renderTable();
+    });
+  });
+
+  // ── Filtering ──
+
+  function getFilteredProxies() {
+    let list = proxies;
+
+    if (showFavsOnly) {
+      const favs = getFavs();
+      list = list.filter((p) => favs[`${p.ip}:${p.port}`]);
+    }
+
+    if (filterText) {
+      const q = filterText.toLowerCase();
+      list = list.filter((p) =>
+        p.ip.includes(q) ||
+        String(p.port).includes(q) ||
+        p.type.includes(q) ||
+        (p.country || "").toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }
+
+  filterInput.addEventListener("input", () => {
+    filterText = filterInput.value.trim();
+    renderTable();
+  });
+
+  favToggle.addEventListener("click", () => {
+    showFavsOnly = !showFavsOnly;
+    favToggle.classList.toggle("active", showFavsOnly);
+    favToggle.textContent = showFavsOnly ? "Show All" : "Favorites";
+
+    if (showFavsOnly && proxies.length === 0) {
+      // Load favorites into the table
+      const favs = getFavs();
+      const favList = Object.values(favs);
+      if (favList.length > 0) {
+        proxies = favList;
+        sortProxies();
+      }
+    }
+
+    renderTable();
+    updateCount();
+  });
+
+  // ── Rendering ──
+
+  function latencyClass(ms) {
+    if (ms < 1000) return "latency-fast";
+    if (ms < 3000) return "latency-mid";
+    return "latency-slow";
+  }
+
+  function latencyBarWidth(ms) {
+    // Scale: 0ms = 100%, 5000ms+ = 5%
+    return Math.max(5, Math.round(100 - (ms / 5000) * 95));
+  }
+
+  function esc(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function countryFlag(code) {
+    if (!code || code.length !== 2) return "";
+    const c = code.toUpperCase();
+    return String.fromCodePoint(...[...c].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
+  }
+
+  function formatCountry(code) {
+    if (!code || code === "??") return "??";
+    return countryFlag(code) + " " + code.toUpperCase();
+  }
+
+  function renderTable() {
+    const list = getFilteredProxies();
+    if (list.length === 0) {
+      const msg = showFavsOnly
+        ? "No favorites yet. Star proxies to save them."
+        : (proxies.length > 0 ? "No proxies match your filter." : 'Click <strong>Scan Proxies</strong> or press <strong>Enter</strong> to begin');
+      proxyBody.innerHTML = `<tr><td colspan="7" class="empty-state">${msg}</td></tr>`;
+      loadMoreBtn.style.display = "none";
+      return;
+    }
+    const visible = list.slice(0, pageSize);
+    const hasMore = list.length > pageSize;
+    loadMoreBtn.style.display = hasMore ? "" : "none";
+    loadMoreBtn.textContent = hasMore ? `Load More (${list.length - pageSize} remaining)` : "";
+    proxyBody.innerHTML = visible.map((p) => {
+      const key = `${p.ip}:${p.port}`;
+      const fav = isFav(p.ip, p.port);
+      const cls = latencyClass(p.latency);
+      const bw = latencyBarWidth(p.latency);
+      const safePort = parseInt(p.port, 10) || 0;
+      const safeLat = parseInt(p.latency, 10) || 0;
+      return `
+        <tr class="${fav ? "fav-row" : ""}" data-key="${esc(key)}">
+          <td>${esc(p.ip)}</td>
+          <td>${safePort}</td>
+          <td>${esc(p.type)}</td>
+          <td><div class="latency-cell ${cls}">
+            <div class="latency-bar"><div class="latency-bar-fill" style="width:${bw}%"></div></div>
+            <span>${safeLat}ms</span>
+          </div></td>
+          <td>${formatCountry(p.country)}</td>
+          <td class="${p.anonymity === "elite" ? "latency-fast" : p.anonymity === "transparent" ? "latency-slow" : ""}">${esc(p.anonymity || "??")}</td>
+          <td><div class="row-actions">
+            <button class="row-btn btn-fav ${fav ? "fav-active" : ""}" data-key="${esc(key)}" title="Favorite">${fav ? "\u2605" : "\u2606"}</button>
+            <button class="row-btn btn-recheck" data-key="${esc(key)}" title="Re-check">\u21BB</button>
+            <button class="row-btn btn-copy" data-key="${esc(key)}" title="Copy">Copy</button>
+          </div></td>
+        </tr>`;
+    }).join("");
+  }
+
+  loadMoreBtn.addEventListener("click", () => {
+    pageSize += PAGE_SIZE;
+    renderTable();
+    updateCount();
+  });
+
+  function appendRow(p) {
+    const empty = proxyBody.querySelector(".empty-state");
+    if (empty) empty.parentElement.remove();
+
+    const fav = isFav(p.ip, p.port);
+    const key = `${p.ip}:${p.port}`;
+    const cls = latencyClass(p.latency);
+    const bw = latencyBarWidth(p.latency);
+    const safePort = parseInt(p.port, 10) || 0;
+    const safeLat = parseInt(p.latency, 10) || 0;
+    const tr = document.createElement("tr");
+    if (fav) tr.classList.add("fav-row");
+    tr.dataset.key = key;
+    tr.innerHTML = `
+      <td>${esc(p.ip)}</td>
+      <td>${safePort}</td>
+      <td>${esc(p.type)}</td>
+      <td><div class="latency-cell ${cls}">
+        <div class="latency-bar"><div class="latency-bar-fill" style="width:${bw}%"></div></div>
+        <span>${safeLat}ms</span>
+      </div></td>
+      <td>${formatCountry(p.country)}</td>
+      <td class="${p.anonymity === "elite" ? "latency-fast" : p.anonymity === "transparent" ? "latency-slow" : ""}">${esc(p.anonymity || "??")}</td>
+      <td><div class="row-actions">
+        <button class="row-btn btn-fav ${fav ? "fav-active" : ""}" data-key="${esc(key)}" title="Favorite">${fav ? "\u2605" : "\u2606"}</button>
+        <button class="row-btn btn-recheck" data-key="${esc(key)}" title="Re-check">\u21BB</button>
+        <button class="row-btn btn-copy" data-key="${esc(key)}" title="Copy">Copy</button>
+      </div></td>`;
+    proxyBody.appendChild(tr);
+  }
+
+  function updateCount() {
+    const filtered = getFilteredProxies();
+    const showing = filtered.length;
+    const total = proxies.length;
+    if (total === 0 && !showFavsOnly) {
+      proxyCount.innerHTML = "No proxies yet";
+    } else if (showing === total) {
+      proxyCount.innerHTML = `Found <strong>${total}</strong> working ${total === 1 ? "proxy" : "proxies"}`;
+    } else {
+      proxyCount.innerHTML = `Showing <strong>${showing}</strong> of ${total}`;
+    }
+  }
+
+  // ── Row Actions (delegated) ──
+
+  function findProxy(key) {
+    return proxies.find((p) => `${p.ip}:${p.port}` === key);
+  }
+
+  proxyBody.addEventListener("click", (e) => {
+    const btn = e.target.closest(".row-btn");
+    if (!btn) return;
+    const key = btn.dataset.key;
+    const [ip, portStr] = key.split(":");
+    const port = parseInt(portStr, 10);
+    const proxy = findProxy(key);
+
+    // Copy
+    if (btn.classList.contains("btn-copy")) {
+      navigator.clipboard.writeText(key).then(() => {
+        btn.textContent = "Done";
+        btn.classList.add("copied");
+        setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 1200);
+      });
+      return;
+    }
+
+    // Favorite
+    if (btn.classList.contains("btn-fav")) {
+      toggleFav(ip, port, proxy || { ip, port, type: "?", latency: 0, country: null });
+      const now = isFav(ip, port);
+      btn.classList.toggle("fav-active", now);
+      btn.textContent = now ? "\u2605" : "\u2606";
+      const row = btn.closest("tr");
+      if (row) row.classList.toggle("fav-row", now);
+      showToast(now ? "Added to favorites" : "Removed from favorites");
+      return;
+    }
+
+    // Re-check
+    if (btn.classList.contains("btn-recheck") && proxy) {
+      btn.classList.add("rechecking");
+      btn.textContent = "...";
+      const timeout = $("#timeout").value || 5000;
+      const testUrl = $("#testUrl").value || "httpbin";
+      fetch(`/api/check?ip=${encodeURIComponent(ip)}&port=${port}&timeout=${timeout}&testUrl=${encodeURIComponent(testUrl)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          btn.classList.remove("rechecking");
+          if (data.alive) {
+            proxy.latency = data.latency;
+            btn.textContent = "\u21BB";
+            showToast(`${key} alive — ${data.latency}ms`);
+          } else {
+            btn.textContent = "\u2717";
+            btn.style.color = "var(--red)";
+            showToast(`${key} is dead`);
+            setTimeout(() => { btn.textContent = "\u21BB"; btn.style.color = ""; }, 2000);
+          }
+          renderTable();
+          updateStats();
+        })
+        .catch(() => {
+          btn.classList.remove("rechecking");
+          btn.textContent = "\u21BB";
+        });
+    }
+  });
+
+  // ── Copy All / Export ──
+
+  copyAllBtn.addEventListener("click", () => {
+    const list = getFilteredProxies();
+    if (!list.length) return;
+    const text = list.map((p) => `${p.ip}:${p.port}`).join("\n");
+    navigator.clipboard.writeText(text).then(() => showToast(`Copied ${list.length} proxies`));
+  });
+
+  exportBtn.addEventListener("click", () => {
+    const list = getFilteredProxies();
+    if (!list.length) return;
+    const rows = [["IP", "Port", "Type", "Latency (ms)", "Country", "Anonymity"]];
+    list.forEach((p) => rows.push([p.ip, p.port, p.type, p.latency, p.country || "??", p.anonymity || "??"]));
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "proxies.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast("Exported CSV");
+  });
+
+  function downloadBlob(content, filename, type) {
+    const blob = new Blob([content], { type });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  $("#exportJsonBtn").addEventListener("click", () => {
+    const list = getFilteredProxies();
+    if (!list.length) return;
+    downloadBlob(JSON.stringify(list, null, 2), "proxies.json", "application/json");
+    showToast("Exported JSON");
+  });
+
+  $("#exportTxtBtn").addEventListener("click", () => {
+    const list = getFilteredProxies();
+    if (!list.length) return;
+    downloadBlob(list.map((p) => `${p.ip}:${p.port}`).join("\n"), "proxies.txt", "text/plain");
+    showToast("Exported TXT");
+  });
+
+  // ── Auto-Refresh ──
+
+  let countdownInterval = null;
+  let autoRefreshTarget = null;
+
+  function updateCountdownDisplay() {
+    if (!autoRefreshTarget) {
+      autoRefreshCb.nextElementSibling.textContent = "Auto-refresh";
+      return;
+    }
+    const remaining = Math.max(0, autoRefreshTarget - Date.now());
+    if (remaining === 0) {
+      autoRefreshCb.nextElementSibling.textContent = "Auto-refresh";
+      return;
+    }
+    const m = Math.floor(remaining / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    autoRefreshCb.nextElementSibling.textContent = `Auto-refresh (${m}:${String(s).padStart(2, "0")})`;
+  }
+
+  function clearCountdown() {
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+    autoRefreshTarget = null;
+    autoRefreshCb.nextElementSibling.textContent = "Auto-refresh";
+  }
+
+  autoRefreshCb.addEventListener("change", () => {
+    autoIntervalField.style.display = autoRefreshCb.checked ? "" : "none";
+    if (autoRefreshCb.checked) {
+      scheduleAutoRefresh();
+    } else {
+      clearTimeout(autoRefreshTimer);
+      autoRefreshTimer = null;
+      clearCountdown();
+    }
+  });
+
+  autoIntervalInput.addEventListener("change", () => {
+    if (autoRefreshCb.checked) scheduleAutoRefresh();
+  });
+
+  function scheduleAutoRefresh() {
+    clearTimeout(autoRefreshTimer);
+    clearCountdown();
+    const mins = Math.max(1, parseInt(autoIntervalInput.value, 10) || 5);
+    const ms = mins * 60 * 1000;
+    autoRefreshTarget = Date.now() + ms;
+    countdownInterval = setInterval(updateCountdownDisplay, 1000);
+    updateCountdownDisplay();
+    autoRefreshTimer = setTimeout(() => {
+      clearCountdown();
+      if (!eventSource && autoRefreshCb.checked) {
+        startScan();
+      }
+    }, ms);
+  }
+
+  // ── Sources Panel ──
+
+  const SOURCE_GROUPS = [
+    { label: "APIs", sources: ["ProxyScrape", "Geonode", "PubProxy", "FreeProxyList"] },
+    { label: "Scrapers", sources: ["ProxyNova", "FreeProxyCz"] },
+    { label: "GitHub Lists", sources: ["SpeedX", "Proxifly", "ErcinDedeoglu", "Monosans", "Clarketm", "KangProxy", "Vakhov", "ShiftyTR", "Jetkai", "Iplocate", "OpenProxyList", "Sunny9577", "MuRongPIG", "Roosterkid"] },
+    { label: "Other", sources: ["SpysMe", "Hidemium"] },
+  ];
+
+  const ALL_SOURCES = SOURCE_GROUPS.flatMap((g) => g.sources);
+  const sourcesPanel = $("#sourcesPanel");
+  const sourcesHeader = $("#sourcesHeader");
+  const sourcesBody = $("#sourcesBody");
+  const sourcesTitle = $("#sourcesTitle");
+
+  function getDisabledSources() {
+    try { return JSON.parse(localStorage.getItem("proxy_sources_disabled") || "[]"); } catch { return []; }
+  }
+
+  function saveDisabledSources(disabled) {
+    safeSave("proxy_sources_disabled", disabled);
+  }
+
+  function updateSourcesCount() {
+    const disabled = getDisabledSources();
+    const enabled = ALL_SOURCES.length - disabled.filter((s) => ALL_SOURCES.includes(s)).length;
+    sourcesTitle.textContent = `Sources (${enabled}/${ALL_SOURCES.length})`;
+  }
+
+  function getEnabledSources() {
+    const disabled = new Set(getDisabledSources());
+    return ALL_SOURCES.filter((s) => !disabled.has(s));
+  }
+
+  // Render checkboxes
+  (function renderSourcesPanel() {
+    const disabled = new Set(getDisabledSources());
+    let html = `<div class="sources-actions">
+      <button class="btn-sm" id="srcSelectAll">Select All</button>
+      <button class="btn-sm" id="srcDeselectAll">Deselect All</button>
+    </div>`;
+    for (const group of SOURCE_GROUPS) {
+      html += `<div class="source-group"><div class="source-group-label">${group.label}</div><div class="source-grid">`;
+      for (const name of group.sources) {
+        const checked = !disabled.has(name) ? "checked" : "";
+        html += `<div class="source-check"><input type="checkbox" id="src_${name}" value="${name}" ${checked}><label for="src_${name}">${name}</label></div>`;
+      }
+      html += `</div></div>`;
+    }
+    sourcesBody.innerHTML = html;
+
+    // Checkbox change handlers
+    sourcesBody.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const disabled = [];
+        sourcesBody.querySelectorAll('input[type="checkbox"]').forEach((c) => {
+          if (!c.checked) disabled.push(c.value);
+        });
+        saveDisabledSources(disabled);
+        updateSourcesCount();
+      });
+    });
+
+    // Select All / Deselect All
+    $("#srcSelectAll").addEventListener("click", () => {
+      sourcesBody.querySelectorAll('input[type="checkbox"]').forEach((c) => (c.checked = true));
+      saveDisabledSources([]);
+      updateSourcesCount();
+    });
+
+    $("#srcDeselectAll").addEventListener("click", () => {
+      sourcesBody.querySelectorAll('input[type="checkbox"]').forEach((c) => (c.checked = false));
+      saveDisabledSources([...ALL_SOURCES]);
+      updateSourcesCount();
+    });
+  })();
+
+  updateSourcesCount();
+
+  // Toggle panel
+  sourcesHeader.addEventListener("click", () => {
+    sourcesPanel.classList.toggle("open");
+  });
+
+  // ── Custom Proxy Paste ──
+
+  const pastePanel = $("#pastePanel");
+  const pasteHeader = $("#pasteHeader");
+  const pasteInput = $("#pasteInput");
+  const pasteTestBtn = $("#pasteTestBtn");
+  const pasteClearBtn = $("#pasteClearBtn");
+  const pasteCount = $("#pasteCount");
+
+  pasteHeader.addEventListener("click", () => pastePanel.classList.toggle("open"));
+
+  function parsePasteLines() {
+    return pasteInput.value.split("\n").map(l => l.trim()).filter(l => /^\d{1,3}(\.\d{1,3}){3}:\d{1,5}$/.test(l));
+  }
+
+  pasteInput.addEventListener("input", () => {
+    const lines = parsePasteLines();
+    pasteCount.textContent = lines.length ? `${lines.length} valid` : "";
+  });
+
+  pasteClearBtn.addEventListener("click", () => {
+    pasteInput.value = "";
+    pasteCount.textContent = "";
+  });
+
+  pasteTestBtn.addEventListener("click", () => {
+    const lines = parsePasteLines();
+    if (!lines.length) { showToast("No valid ip:port lines found"); return; }
+    if (eventSource) { stopScan(); }
+
+    // Reset state
+    proxies = [];
+    scanStats = { checked: 0, total: 0 };
+    scanDone = false;
+    pageSize = PAGE_SIZE;
+    proxyBody.innerHTML = "";
+    updateCount();
+    updateStats();
+    statusBar.classList.add("visible");
+    statusText.textContent = `Testing ${lines.length} custom proxies...`;
+    progressFill.style.width = "0%";
+    progressFill.classList.add("indeterminate");
+    scanBtn.textContent = "Stop";
+    scanBtn.classList.add("scanning");
+
+    // POST to /api/scan-custom
+    fetch("/api/scan-custom", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proxies: lines,
+        timeout: $("#timeout").value,
+        concurrency: $("#concurrency").value,
+        testUrl: $("#testUrl").value,
+      }),
+    }).then(response => {
+      if (!response.ok) throw new Error("Server error");
+      // Read SSE from response body stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      function processSSE(text) {
+        buffer += text;
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop(); // keep incomplete chunk
+        for (const part of parts) {
+          if (!part.trim() || part.startsWith(":")) continue;
+          const eventMatch = part.match(/^event:\s*(.+)$/m);
+          const dataMatch = part.match(/^data:\s*(.+)$/m);
+          if (!eventMatch || !dataMatch) continue;
+          const evtName = eventMatch[1];
+          const d = JSON.parse(dataMatch[1]);
+
+          if (evtName === "status") {
+            statusText.textContent = d.message;
+            if (d.total && d.checked !== undefined) {
+              scanStats.checked = d.checked;
+              scanStats.total = d.total;
+              progressFill.classList.remove("indeterminate");
+              progressFill.style.width = Math.min(100, Math.round((d.checked / d.total) * 100)) + "%";
+              updateStats();
+            }
+          } else if (evtName === "found") {
+            proxies.push(d);
+            appendRow(d);
+            updateCount();
+            updateStats();
+          } else if (evtName === "done") {
+            scanDone = true;
+            statusText.textContent = d.message;
+            scanStats.checked = d.checked || scanStats.checked;
+            progressFill.classList.remove("indeterminate");
+            progressFill.style.width = "100%";
+            stopScan();
+            sortProxies();
+            renderTable();
+            updateCount();
+            updateStats();
+            saveHistory(proxies);
+            playDoneSound();
+          }
+        }
+      }
+
+      function pump() {
+        return reader.read().then(({ done, value }) => {
+          if (done) { processSSE("\n\n"); return; }
+          processSSE(decoder.decode(value, { stream: true }));
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(() => {
+      statusText.textContent = "Custom scan failed.";
+      stopScan();
+    });
+  });
+
+  // ── Scan ──
+
+  function stopScan() {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    scanBtn.textContent = "Scan Proxies";
+    scanBtn.classList.remove("scanning");
+    scanBtn.disabled = false;
+    progressFill.classList.remove("indeterminate");
+  }
+
+  function startScan() {
+    if (eventSource) {
+      stopScan();
+      statusText.textContent = `Scan stopped. Found ${proxies.length} working ${proxies.length === 1 ? "proxy" : "proxies"} so far.`;
+      return;
+    }
+
+    // Build query
+    const params = new URLSearchParams();
+    params.set("type", $("#type").value);
+    params.set("timeout", $("#timeout").value);
+    params.set("concurrency", $("#concurrency").value);
+    params.set("testUrl", $("#testUrl").value);
+    const lim = $("#limit").value;
+    if (lim && parseInt(lim) > 0) params.set("limit", lim);
+    const ctry = $("#country").value.trim();
+    if (ctry) params.set("country", ctry);
+    if ($("#anonymous").checked) params.set("anonymous", "true");
+    const enabledSources = getEnabledSources();
+    if (enabledSources.length < ALL_SOURCES.length) {
+      params.set("sources", enabledSources.join(","));
+    }
+
+    // Reset source badges and add spinners to enabled sources
+    const enabled = new Set(getEnabledSources());
+    sourcesBody.querySelectorAll(".source-check").forEach((el) => {
+      el.classList.remove("source-ok", "source-fail", "source-fetching");
+      const badge = el.querySelector(".source-badge");
+      if (badge) badge.remove();
+      const oldSpin = el.querySelector(".source-spinner");
+      if (oldSpin) oldSpin.remove();
+      const cb = el.querySelector("input[type='checkbox']");
+      if (cb && enabled.has(cb.value)) {
+        el.classList.add("source-fetching");
+        const spinner = document.createElement("span");
+        spinner.className = "source-spinner";
+        el.querySelector("label").appendChild(spinner);
+      }
+    });
+
+    // Reset state
+    proxies = [];
+    scanStats = { checked: 0, total: 0 };
+    scanDone = false;
+    pageSize = PAGE_SIZE;
+    proxyBody.innerHTML = "";
+    updateCount();
+    updateStats();
+    statusBar.classList.add("visible");
+    statusText.textContent = "Starting scan...";
+    progressFill.style.width = "0%";
+    progressFill.classList.add("indeterminate");
+    scanBtn.textContent = "Stop";
+    scanBtn.classList.add("scanning");
+
+    // Reset fav-only view during scan
+    if (showFavsOnly) {
+      showFavsOnly = false;
+      favToggle.classList.remove("active");
+      favToggle.textContent = "Favorites";
+    }
+
+    eventSource = new EventSource(`/api/scan?${params}`);
+
+    eventSource.addEventListener("status", (e) => {
+      const d = JSON.parse(e.data);
+      statusText.textContent = d.message;
+      if (d.total && d.checked !== undefined) {
+        scanStats.checked = d.checked;
+        scanStats.total = d.total;
+        progressFill.classList.remove("indeterminate");
+        progressFill.style.width = Math.min(100, Math.round((d.checked / d.total) * 100)) + "%";
+        updateStats();
+      }
+      // Mark source status in panel
+      if (d.sourceDone) {
+        const wrap = document.querySelector(`#src_${d.sourceDone}`)?.closest(".source-check");
+        if (wrap) {
+          wrap.classList.remove("source-ok", "source-fail", "source-fetching");
+          wrap.classList.add(d.sourceCount > 0 ? "source-ok" : "source-fail");
+          const spinner = wrap.querySelector(".source-spinner");
+          if (spinner) spinner.remove();
+          const old = wrap.querySelector(".source-badge");
+          if (old) old.remove();
+          const badge = document.createElement("span");
+          badge.className = "source-badge";
+          badge.textContent = d.sourceCount > 0 ? d.sourceCount.toLocaleString() : "FAIL";
+          wrap.querySelector("label").appendChild(badge);
+        }
+      }
+    });
+
+    eventSource.addEventListener("found", (e) => {
+      const p = JSON.parse(e.data);
+      proxies.push(p);
+      appendRow(p);
+      updateCount();
+      updateStats();
+    });
+
+    eventSource.addEventListener("done", (e) => {
+      scanDone = true;
+      const d = JSON.parse(e.data);
+      statusText.textContent = d.message;
+      scanStats.checked = d.checked || scanStats.checked;
+      progressFill.classList.remove("indeterminate");
+      progressFill.style.width = "100%";
+      stopScan();
+      sortProxies();
+      renderTable();
+      updateCount();
+      updateStats();
+      saveHistory(proxies);
+      playDoneSound();
+
+      // Schedule next auto-refresh
+      if (autoRefreshCb.checked) scheduleAutoRefresh();
+    });
+
+    eventSource.onerror = () => {
+      if (scanDone) return; // Server closed connection after completing — not an error
+      statusText.textContent = "Connection lost. Scan stopped.";
+      stopScan();
+      updateStats();
+    };
+  }
+
+  scanBtn.addEventListener("click", startScan);
+
+  // ── Keyboard Shortcuts ──
+
+  document.addEventListener("keydown", (e) => {
+    // Don't trigger when typing in inputs
+    const tag = e.target.tagName;
+    const isInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+
+    if (e.key === "Enter" && !isInput) {
+      e.preventDefault();
+      if (!eventSource) startScan();
+    }
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (eventSource) {
+        stopScan();
+        statusText.textContent = `Scan stopped. Found ${proxies.length} working ${proxies.length === 1 ? "proxy" : "proxies"} so far.`;
+      }
+      // Also blur any focused input
+      if (isInput) e.target.blur();
+    }
+
+    if (e.key === "f" && !isInput && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      filterInput.focus();
+    }
+
+    if (e.key === "s" && !isInput && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      sourcesPanel.classList.toggle("open");
+    }
+
+    if (e.key === "t" && !isInput && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      applyTheme(getTheme() === "dark" ? "light" : "dark");
+    }
+  });
+
+  // ── Load last session on startup ──
+
+  const history = loadHistory();
+  if (history.length > 0) {
+    proxies = history;
+    sortProxies();
+    scanStats.checked = history.length;
+    renderTable();
+    updateCount();
+    updateStats();
+    statusBar.classList.add("visible");
+    const ago = Math.round((Date.now() - JSON.parse(localStorage.getItem("proxy_history"))?.timestamp) / 60000);
+    const scanHist = getScanHistory();
+    const histLine = scanHist.length > 1
+      ? " | Recent: " + scanHist.slice(0, 3).map(h => {
+          const a = Math.round((Date.now() - h.timestamp) / 60000);
+          return `${h.count}/${h.checked} (${a}m ago)`;
+        }).join(", ")
+      : "";
+    statusText.textContent = `Loaded ${history.length} proxies from last session (${ago}m ago).${histLine} Run a new scan to refresh.`;
+  }
+})();
+</script>
+</body>
+</html>

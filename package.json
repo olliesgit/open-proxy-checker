@@ -1,0 +1,21 @@
+{
+  "name": "open-proxy-checker",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Fetch and validate public proxies via CLI or local web UI.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start:server": "node bin/start-server.mjs",
+    "start:cli": "node bin/start-cli.mjs",
+    "dev:server": "npm run start:server -- --port 3000",
+    "dev:cli": "npm run start:cli",
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "bin": {
+    "proxy-checker": "./bin/start-cli.mjs",
+    "proxy-checker-server": "./bin/start-server.mjs"
+  }
+}
