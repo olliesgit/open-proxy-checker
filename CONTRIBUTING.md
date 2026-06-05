@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in improving this project.
+Thanks for improving this project.
 
 ## Install
 
@@ -21,28 +21,26 @@ npm run start:server -- --port 3000
 
 ```bash
 npm test
+npm run smoke
 ```
 
 ## Submit issues
 
-- Use the issue templates if present.
-- Include Node.js version and OS.
-- Describe expected vs actual behavior.
-- Keep reports focused on one problem.
+Use issue templates when possible. Include Node.js version, OS, and reproduction steps.
 
 ## Pull requests
 
-- Create a feature branch from `main`.
-- Include context and rationale.
-- Keep changes minimal and reviewable.
-- After review, squash or rebase before merge.
+- Create a feature branch from `main`
+- Include context and rationale
+- Keep changes reviewable
+- Update docs if behavior changes
 
 ## Code style
 
-- Use Node.js ESM.
-- Prefer small, testable modules.
-- Avoid personal or environment-specific settings.
+- Node.js ESM
+- Small, testable utilities
+- No personal data or local paths in shipped files
 
 ## Responsible use
 
-This project is for local development, research, and authorized testing. Do not use it against services you do not own or have explicit permission to test.
+Only use this tool on systems you own or are authorized to test.

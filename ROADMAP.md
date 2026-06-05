@@ -11,13 +11,13 @@
 ## Mid term
 
 - Add Docker support
-- Make proxy sources configurable without editing code
-- Add health check history in the web UI
+- Make proxy sources configurable
+- Add health check history
 - Improve source timeout and retry behavior
 
 ## Future
 
 - Add structured result formats
-- Optional proxy rotation helper script
+- Optional proxy rotation helper scripts
 - Expand proxy source coverage
-- Improve documentation and web UI polish
+- Improve web UI polish
