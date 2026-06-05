@@ -1,6 +1,8 @@
-function isValidIp(ip) {
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) && ip.split(".").every((part) => parseInt(part, 10) <= 255);
-}
+#!/usr/bin/env node
+
+/**
+ * Shared proxy parsing utilities.
+ */
 
 export function parseIpPortList(text, type) {
   const proxies = [];
@@ -9,7 +11,7 @@ export function parseIpPortList(text, type) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
     const [ip, port] = trimmed.split(":");
-    if (ip && port && isValidIp(ip)) {
+    if (ip && port && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
       const p = parseInt(port, 10);
       if (p > 0 && p <= 65535) proxies.push({ ip, port: p, type, country: null, anonymity: null });
     }
@@ -24,11 +26,8 @@ export function parseProtocolList(text) {
     const trimmed = line.trim();
     const m = trimmed.match(/^(https?|socks[45]):\/\/(\d{1,3}(?:\.\d{1,3}){3}):(\d+)$/);
     if (m) {
-      const ip = m[2];
-      const port = parseInt(m[3], 10);
-      if (!isValidIp(ip) || port <= 0 || port > 65535) continue;
       const type = m[1] === "socks4" ? "socks4" : m[1] === "socks5" ? "socks5" : m[1];
-      proxies.push({ ip, port, type, country: null, anonymity: null });
+      proxies.push({ ip: m[2], port: parseInt(m[3], 10), type, country: null, anonymity: null });
     }
   }
   return proxies;

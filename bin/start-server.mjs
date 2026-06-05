@@ -275,22 +275,7 @@ const SOURCE_REGISTRY = new Map([
   ["Roosterkid", sourceRoosterkid],
 ]);
 
-const TEST_URLS = {
-  httpbin: { path: "http://httpbin.org/ip", host: "httpbin.org", validate: (body) => body.includes("origin") },
-  icanhazip: { path: "http://icanhazip.com/", host: "icanhazip.com", validate: (body) => /\d+\.\d+\.\d+\.\d+/.test(body) },
-  google: { path: "http://www.google.com/", host: "www.google.com", validate: () => true },
-};
-
-function getTestConfig(testUrl) {
-  if (TEST_URLS[testUrl]) return TEST_URLS[testUrl];
-  try {
-    const u = new URL(testUrl);
-    if (!["http:", "https:"].includes(u.protocol)) return TEST_URLS.httpbin;
-    return { path: testUrl, host: u.hostname, validate: () => true };
-  } catch {
-    return TEST_URLS.httpbin;
-  }
-}
+const DEFAULT_TEST_CONFIG = { path: "http://httpbin.org/ip", host: "httpbin.org", validate: (body) => body.includes("origin") };
 
 const LEAK_HEADERS = ["x-forwarded-for", "via", "x-real-ip", "forwarded", "proxy-connection"];
 
@@ -302,21 +287,22 @@ function detectAnonymity(resHeaders, body) {
 }
 
 function checkProxy(proxy, timeout, testConfig) {
+  const config = testConfig || DEFAULT_TEST_CONFIG;
   return new Promise((resolve) => {
     const start = Date.now();
     const req = http.request({
       hostname: proxy.ip,
       port: proxy.port,
-      path: testConfig.path,
+      path: config.path,
       method: "GET",
       timeout,
-      headers: { Host: testConfig.host },
+      headers: { Host: config.host },
     }, (res) => {
       let body = "";
       res.on("data", (chunk) => (body += chunk));
       res.on("end", () => {
         const latency = Date.now() - start;
-        if (res.statusCode === 200 && testConfig.validate(body)) {
+        if (res.statusCode === 200 && config.validate(body)) {
           const anonymity = detectAnonymity(res.headers, body);
           resolve({ alive: true, latency, anonymity });
         } else {
@@ -336,15 +322,8 @@ async function handleScan(req, res) {
   const failedSources = [];
 
   if (!activeSources.length) {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "Access-Control-Allow-Origin": "*",
-    });
-    res.write(`event: status\ndata: ${JSON.stringify({ message: "No sources enabled." })}\n\n`);
-    res.write(`event: done\ndata: ${JSON.stringify({ message: "No sources enabled.", checked: 0, working: 0 })}\n\n`);
-    res.end();
+    sendAndEnd(res, "status", { message: "No sources enabled." });
+    sendAndEnd(res, "done", { message: "No sources enabled.", checked: 0, working: 0 });
     return;
   }
 
@@ -370,11 +349,8 @@ async function handleScan(req, res) {
     const tracked = sourcePromises.map((p, i) =>
       p.then((proxies) => {
         const got = Array.isArray(proxies) ? proxies.length : 0;
-        let label = `${got} proxies`;
-        if (!got) {
-          label = "0 proxies";
-          failedSources.push(sourceNames[i]);
-        }
+        const label = got ? `${got} proxies` : "0 proxies";
+        if (!got) failedSources.push(sourceNames[i]);
         send("status", {
           message: `Fetching proxy lists... — ${sourceNames[i]}: ${label}`,
           sourceDone: sourceNames[i],
@@ -403,7 +379,7 @@ async function handleScan(req, res) {
       if (r.status === "fulfilled" && r.value) allProxies.push(...r.value);
     }
 
-    if (allProxies.length === 0) {
+    if (!allProxies.length) {
       send("done", { total: 0, checked: 0, message: "No proxies matched your filters." });
       return;
     }
@@ -447,6 +423,17 @@ async function handleScan(req, res) {
   } finally {
     if (!res.writableEnded) res.end();
   }
+}
+
+function sendAndEnd(res, event, data) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  res.end();
 }
 
 const server = http.createServer((req, res) => {

@@ -13,7 +13,8 @@
     "dev:server": "npm run start:server -- --port 3000",
     "dev:cli": "npm run start:cli",
     "smoke": "node scripts/smoke-test.mjs",
-    "test": "node --test test/unit.mjs"
+    "test": "node --test test/unit.mjs",
+    "ci": "npm test && npm run smoke"
   },
   "bin": {
     "proxy-checker": "./bin/start-cli.mjs",
