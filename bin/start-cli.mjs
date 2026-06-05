@@ -12,8 +12,12 @@
 import http from "node:http";
 import https from "node:https";
 import { writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { BANNER, shouldShowBanner } from "../src/banner.mjs";
 import { formatTxt, formatCsv, formatJson } from "../src/exporters.mjs";
+
+const require = createRequire(import.meta.url);
+const { version: VERSION } = require("../package.json");
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +74,9 @@ function parseArgs() {
         opts.format = String(args[++i] || "txt").toLowerCase();
         if (!["json", "csv", "txt"].includes(opts.format)) opts.format = null;
         break;
+      case "--version":
+        console.log(`Open Proxy Checker v${VERSION}`);
+        process.exit(0);
       case "--help":
         showHelp();
         process.exit(0);
@@ -83,7 +90,7 @@ function showHelp() {
     console.error(BANNER);
   }
   console.log([
-    "Open Proxy Checker",
+    `Open Proxy Checker v${VERSION}`,
     "",
     "Usage: node bin/start-cli.mjs [options]",
     "",
@@ -98,6 +105,7 @@ function showHelp() {
     "  --format <fmt>      Output format: json | csv | txt (default: human table)",
     "  --quiet             Suppress progress output to stderr",
     "  --no-banner         Suppress the startup ASCII banner",
+    "  --version           Show version number and exit",
     "  --help              Show this help message",
     "",
     "Examples:",

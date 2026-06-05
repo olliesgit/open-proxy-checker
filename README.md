@@ -1,5 +1,7 @@
 # Open Proxy Checker
 
+[![CI](https://github.com/olliesgit/open-proxy-checker/actions/workflows/ci.yml/badge.svg)](https://github.com/olliesgit/open-proxy-checker/actions/workflows/ci.yml)
+
 Open Proxy Checker is a local CLI and browser-based tool for collecting, deduplicating, validating, filtering, and exporting public proxy lists.
 
 It is designed for legitimate development, QA, research, and network testing workflows where transparent local proxy validation is useful.
