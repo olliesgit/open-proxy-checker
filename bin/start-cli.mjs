@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Proxy Checker Tool (CLI)
+ * Open Proxy Checker -- CLI
+ *
  * Fetches free HTTP/HTTPS/SOCKS proxies from public sources, validates them,
  * and outputs a list of working proxies.
  *
@@ -11,13 +12,15 @@
 import http from "node:http";
 import https from "node:https";
 import { writeFileSync } from "node:fs";
+import { BANNER, shouldShowBanner } from "../src/banner.mjs";
+import { formatTxt, formatCsv, formatJson } from "../src/exporters.mjs";
 
-// ── Config ─────────────────────────────────────────────────────────────────
+// ── Config ───────────────────────────────────────────────────────────────────
 
 const DEFAULT_TIMEOUT = 5000;
 const DEFAULT_CONCURRENCY = 50;
 
-// ── CLI Args ────────────────────────────────────────────────────────────────
+// ── CLI Args ──────────────────────────────────────────────────────────────────
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -30,6 +33,8 @@ function parseArgs() {
     anonymous: false,
     limit: Infinity,
     quiet: false,
+    noBanner: false,
+    format: null,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -58,35 +63,65 @@ function parseArgs() {
       case "--quiet":
         opts.quiet = true;
         break;
+      case "--no-banner":
+        opts.noBanner = true;
+        break;
+      case "--format":
+        opts.format = String(args[++i] || "txt").toLowerCase();
+        if (!["json", "csv", "txt"].includes(opts.format)) opts.format = null;
+        break;
       case "--help":
-        console.log([
-          "Proxy Checker Tool",
-          "",
-          "Usage: node bin/start-cli.mjs [options]",
-          "",
-          "  --timeout <ms>      Connection timeout (default: 5000)",
-          "  --concurrency <n>   Max concurrent checks (default: 50)",
-          "  --output <file>     Save results to file",
-          "  --type <type>       http | https | socks4 | socks5 | all (default: all)",
-          "  --country <code>    Filter by country code (e.g. US)",
-          "  --anonymous         Only anonymous/elite proxies",
-          "  --limit <n>         Stop after N working proxies",
-          "  --quiet             Minimal output",
-        ].join("\n"));
+        showHelp();
         process.exit(0);
     }
   }
   return opts;
 }
 
-// ── Logging ─────────────────────────────────────────────────────────────────
+function showHelp() {
+  if (shouldShowBanner({ noBanner: false })) {
+    console.error(BANNER);
+  }
+  console.log([
+    "Open Proxy Checker",
+    "",
+    "Usage: node bin/start-cli.mjs [options]",
+    "",
+    "Options:",
+    "  --timeout <ms>      Connection timeout per proxy (default: 5000)",
+    "  --concurrency <n>   Max concurrent checks (default: 50)",
+    "  --output <file>     Save results to file",
+    "  --type <type>       http | https | socks4 | socks5 | all (default: all)",
+    "  --country <code>    Filter by country code (e.g. US)",
+    "  --anonymous         Only anonymous/elite proxies",
+    "  --limit <n>         Stop after N working proxies (default: unlimited)",
+    "  --format <fmt>      Output format: json | csv | txt (default: human table)",
+    "  --quiet             Suppress progress output to stderr",
+    "  --no-banner         Suppress the startup ASCII banner",
+    "  --help              Show this help message",
+    "",
+    "Examples:",
+    "  npm run start:cli",
+    "  npm run start:cli -- --timeout 8000 --concurrency 50",
+    "  npm run start:cli -- --type http --country US --limit 20",
+    "  npm run start:cli -- --format json",
+    "  npm run start:cli -- --format csv --output proxies.csv",
+    "  npm run start:cli -- --no-banner",
+    "",
+    "Responsible use:",
+    "  Only test proxies against systems you own or have permission to test.",
+    "",
+  ].join("\n"));
+}
+
+// ── Logging ───────────────────────────────────────────────────────────────────
 
 let QUIET = false;
 function log(...args) {
   if (!QUIET) console.error(...args);
 }
 
-// ── HTTP Helpers ────────────────────────────────────────────────────────────
+// ── HTTP Helpers ──────────────────────────────────────────────────────────────
 
 function fetchJson(url) {
   return new Promise((resolve) => {
@@ -116,7 +151,7 @@ function fetchText(url) {
   });
 }
 
-// ── Proxy Sources ───────────────────────────────────────────────────────────
+// ── Proxy Sources ─────────────────────────────────────────────────────────────
 
 async function sourceProxyScrape() {
   log("  [1/4] Fetching from ProxyScrape...");
@@ -215,7 +250,7 @@ async function sourceFreeProxyList() {
   return proxies;
 }
 
-// ── Proxy Validation ────────────────────────────────────────────────────────
+// ── Proxy Validation ──────────────────────────────────────────────────────────
 
 function checkProxy(proxy, timeout) {
   return new Promise((resolve) => {
@@ -248,7 +283,7 @@ function checkProxy(proxy, timeout) {
   });
 }
 
-// ── Concurrency Pool ────────────────────────────────────────────────────────
+// ── Concurrency Pool ──────────────────────────────────────────────────────────
 
 async function poolCheck(proxies, concurrency, timeout, limit) {
   const working = [];
@@ -266,7 +301,7 @@ async function poolCheck(proxies, concurrency, timeout, limit) {
         proxy.latency = result.latency;
         working.push(proxy);
         log(
-          `  ✓ ${proxy.ip}:${proxy.port} (${proxy.type}) - ${result.latency}ms  [${working.length} found, ${checked}/${total} checked]`
+          `  \u2713 ${proxy.ip}:${proxy.port} (${proxy.type}) - ${result.latency}ms  [${working.length} found, ${checked}/${total} checked]`
         );
       }
     }
@@ -280,7 +315,7 @@ async function poolCheck(proxies, concurrency, timeout, limit) {
   return working;
 }
 
-// ── Dedup ───────────────────────────────────────────────────────────────────
+// ── Dedup ─────────────────────────────────────────────────────────────────────
 
 function dedup(proxies) {
   const seen = new Set();
@@ -292,20 +327,22 @@ function dedup(proxies) {
   });
 }
 
-// ── Main ────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   const opts = parseArgs();
   QUIET = opts.quiet;
 
-  log("╔══════════════════════════════════════════╗");
-  log("║         Proxy Checker Tool v1.0          ║");
-  log("╚══════════════════════════════════════════╝");
-  log("");
+  const useBanner = shouldShowBanner(opts);
+  if (useBanner) {
+    log(BANNER);
+  }
+
   log(`Settings: timeout=${opts.timeout}ms, concurrency=${opts.concurrency}, type=${opts.type}`);
   if (opts.country) log(`  Country filter: ${opts.country}`);
   if (opts.anonymous) log(`  Anonymous only: yes`);
   if (opts.limit < Infinity) log(`  Limit: ${opts.limit}`);
+  if (opts.format) log(`  Format: ${opts.format}`);
   log("");
 
   log("Fetching proxy lists...");
@@ -372,26 +409,54 @@ async function main() {
     process.exit(1);
   }
 
-  const header = `${"IP".padEnd(18)} ${"PORT".padEnd(7)} ${"TYPE".padEnd(8)} ${"LATENCY".padEnd(10)} ${"COUNTRY".padEnd(8)}`;
-  console.log(header);
-  console.log("─".repeat(header.length));
-  for (const p of working) {
-    console.log(
-      `${p.ip.padEnd(18)} ${String(p.port).padEnd(7)} ${p.type.padEnd(8)} ${(p.latency + "ms").padEnd(10)} ${(p.country || "??").padEnd(8)}`
-    );
-  }
+  // Output in requested format
+  if (opts.format === "json") {
+    const json = formatJson(working);
+    if (opts.output) {
+      writeFileSync(opts.output, json, "utf-8");
+      log(`Saved to ${opts.output}`);
+    } else {
+      console.log(json.trimEnd());
+    }
+  } else if (opts.format === "csv") {
+    const csv = formatCsv(working);
+    if (opts.output) {
+      writeFileSync(opts.output, csv, "utf-8");
+      log(`Saved to ${opts.output}`);
+    } else {
+      console.log(csv.trimEnd());
+    }
+  } else if (opts.format === "txt") {
+    const txt = formatTxt(working);
+    if (opts.output) {
+      writeFileSync(opts.output, txt, "utf-8");
+      log(`Saved to ${opts.output}`);
+    } else {
+      console.log(txt.trimEnd());
+    }
+  } else {
+    // Default: human-readable table
+    const header = `${"IP".padEnd(18)} ${"PORT".padEnd(7)} ${"TYPE".padEnd(8)} ${"LATENCY".padEnd(10)} ${"COUNTRY".padEnd(8)}`;
+    console.log(header);
+    console.log("\u2500".repeat(header.length));
+    for (const p of working) {
+      console.log(
+        `${p.ip.padEnd(18)} ${String(p.port).padEnd(7)} ${p.type.padEnd(8)} ${(p.latency + "ms").padEnd(10)} ${(p.country || "??").padEnd(8)}`
+      );
+    }
 
-  if (opts.output) {
-    const lines = working.map(
-      (p) => `${p.ip}:${p.port} | ${p.type} | ${p.latency}ms | ${p.country || "??"}`
-    );
-    writeFileSync(opts.output, lines.join("\n") + "\n", "utf-8");
-    log(`\nSaved to ${opts.output}`);
-  }
+    if (opts.output) {
+      const lines = working.map(
+        (p) => `${p.ip}:${p.port} | ${p.type} | ${p.latency}ms | ${p.country || "??"}`
+      );
+      writeFileSync(opts.output, lines.join("\n") + "\n", "utf-8");
+      log(`\nSaved to ${opts.output}`);
+    }
 
-  log("\n── Raw list (copy-paste) ──");
-  for (const p of working) {
-    log(`${p.ip}:${p.port}`);
+    log("\n\u2015\u2015 Raw list (copy-paste) \u2015\u2015");
+    for (const p of working) {
+      log(`${p.ip}:${p.port}`);
+    }
   }
 }
 

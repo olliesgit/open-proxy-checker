@@ -2,7 +2,7 @@
   "name": "open-proxy-checker",
   "version": "0.1.0",
   "private": false,
-  "description": "Local proxy checker with CLI and web UI for validating public proxies.",
+  "description": "Local CLI and web UI for collecting, deduplicating, validating, and exporting working proxy lists.",
   "license": "MIT",
   "engines": {
     "node": ">=18"
@@ -12,8 +12,8 @@
     "start:cli": "node bin/start-cli.mjs",
     "dev:server": "npm run start:server -- --port 3000",
     "dev:cli": "npm run start:cli",
+    "test": "node --test",
     "smoke": "node scripts/smoke-test.mjs",
-    "test": "node --test test/unit.mjs",
     "ci": "npm test && npm run smoke"
   },
   "bin": {

@@ -1,8 +1,8 @@
 # Contributing
 
-Thanks for improving this project.
+Thanks for improving this project. All contributions are welcome.
 
-## Install
+## Local setup
 
 ```bash
 git clone https://github.com/olliesgit/open-proxy-checker.git
@@ -10,37 +10,58 @@ cd open-proxy-checker
 npm install
 ```
 
-## Run locally
+## Running the CLI
 
 ```bash
 npm run start:cli
+```
+
+Use `--help` to see all available options:
+
+```bash
+npm run start:cli -- --help
+```
+
+## Running the web UI
+
+```bash
 npm run start:server -- --port 3000
 ```
 
-## Run tests
+Open http://localhost:3000 in your browser.
+
+## Running tests
 
 ```bash
 npm test
 npm run smoke
 ```
 
-## Submit issues
+Both must pass before submitting changes.
 
-Use issue templates when possible. Include Node.js version, OS, and reproduction steps.
+## Opening issues
 
-## Pull requests
+- Use the provided issue templates when possible
+- Include your Node.js version and operating system
+- Include steps to reproduce for bug reports
+- Be specific about what you expect vs what happens
 
-- Create a feature branch from `main`
-- Include context and rationale
-- Keep changes reviewable
-- Update docs if behavior changes
+## Opening pull requests
+
+1. Create a feature branch from `main`
+2. Make your changes with clear commit messages
+3. Include context and rationale in the PR description
+4. Keep changes focused and reviewable
+5. Update docs if behaviour changes
+6. Ensure tests pass and the smoke test passes
 
 ## Code style
 
-- Node.js ESM
-- Small, testable utilities
-- No personal data or local paths in shipped files
+- Node.js ESM (`.mjs` extensions)
+- Small, focused, testable utilities
+- No personal data, local paths, or credentials in shipped files
+- Use `node:test` for unit tests (no external test framework)
 
-## Responsible use
+## Responsible use expectations
 
-Only use this tool on systems you own or are authorized to test.
+This tool is intended for legitimate development, QA, research, and network testing. Only use it against systems you own or are authorised to test. Contributions that encourage or facilitate abuse will not be accepted.
