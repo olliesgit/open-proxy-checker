@@ -1,0 +1,43 @@
+# Open Proxy Checker Configuration
+# Copy this to proxy-checker.yaml and customize
+
+# Cache TTL (hours)
+cache_ttl_hours: 6
+
+# Concurrency for proxy validation
+concurrency: 50
+
+# Default timeout for source fetching (ms)
+timeout_ms: 5000
+
+# Source filtering (empty = all enabled)
+sources:
+  enabled: []
+  disabled: []
+
+# Validation probes - define your own endpoint health checks
+validation:
+  check_timeout_ms: 5000
+  probes:
+    # - url: "http://httpbin.org/ip"
+    #   expect: "origin"
+    # - url: "https://icanhazip.com"
+    # - url: "https://www.google.com/generate_204"
+    #   expect_status: 204
+
+# Export defaults
+export:
+  default_format: table  # table, csv, json, txt
+
+# Notification hooks - fire shell commands or webhooks when matching proxies are found
+notify:
+  on_found: null  # e.g. 'curl -d "ip=${ip}:${port}" https://hooks.example.com/proxy'
+  elite_only: false
+  min_latency: null
+  max_latency: null
+  debounce_ms: 60000
+
+# Web server settings
+server:
+  port: 3000
+  auto_refresh_minutes: 5

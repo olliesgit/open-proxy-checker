@@ -1,0 +1,12 @@
+services:
+  proxy-checker:
+    build: .
+    container_name: proxy-checker
+    ports:
+      - "3000:3000"
+    volumes:
+      - .cache:/app/.cache
+      - ./proxy-checker.yaml:/app/proxy-checker.yaml:ro
+    environment:
+      - PORT=3000
+    restart: unless-stopped

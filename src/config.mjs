@@ -30,9 +30,17 @@ const DEFAULTS = {
   },
   validation: {
     check_timeout_ms: 5000,
+    probes: [],
   },
   export: {
     default_format: "table",
+  },
+  notify: {
+    on_found: null,
+    elite_only: false,
+    min_latency: null,
+    max_latency: null,
+    debounce_ms: 60000,
   },
   server: {
     port: 3000,

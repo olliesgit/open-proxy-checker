@@ -11,8 +11,11 @@ import { formatTxt, formatCsv, formatJson } from "../src/exporters.mjs";
 import { SOURCE_REGISTRY } from "../src/sources.mjs";
 import { parseIpPortList, parseProtocolList } from "../src/parsers.mjs";
 import { checkProxy } from "../src/check-chain.mjs";
+import { buildProbes } from "../src/check-chain.mjs";
 import { loadConfig } from "../src/config.mjs";
 import { startScan, finishScan, recordProxyResults, closeDb } from "../src/history.mjs";
+import { startRotatingProxy } from "../src/rotate-server.mjs";
+import { checkNotify } from "../src/notify.mjs";
 import {
   createCircuitBreaker,
   splitByCache,
@@ -44,6 +47,7 @@ const C = NO_COLOR
 const CFG = loadConfig();
 const DEFAULT_TIMEOUT = CFG.timeout_ms || 5000;
 const DEFAULT_CONCURRENCY = CFG.concurrency || 50;
+const PROBES = buildProbes(CFG.validation?.probes);
 
 // ── CLI Args ──────────────────────────────────────────────────────────────────
 
@@ -56,10 +60,11 @@ function parseArgs() {
     type: "all",
     country: null,
     anonymous: false,
-    limit: Infinity,
+    format: null,
     quiet: false,
     noBanner: false,
-    format: null,
+    serve: false,
+    servePort: 8888,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -90,6 +95,12 @@ function parseArgs() {
         break;
       case "--no-banner":
         opts.noBanner = true;
+        break;
+      case "--serve":
+        opts.serve = true;
+        break;
+      case "--serve-port":
+        opts.servePort = Math.max(1024, Math.min(65535, parseInt(args[++i], 10) || 8888));
         break;
       case "--format":
         opts.format = String(args[++i] || "txt").toLowerCase();
@@ -126,6 +137,8 @@ function showHelp() {
     "  --format <fmt>      Output format: json | csv | txt (default: human table)",
     "  --quiet             Suppress progress output to stderr",
     "  --no-banner         Suppress the startup ASCII banner",
+    "  --serve             Start rotating proxy server after scan",
+    "  --serve-port <n>    Port for rotating proxy server (default: 8888)",
     "  --version           Show version number and exit",
     "  --help              Show this help message",
     "",
@@ -193,7 +206,7 @@ async function poolCheck(proxies, concurrency, timeout, limit) {
       // Check effective concurrency after each iteration
       const i = index++;
       const proxy = proxies[i];
-      const result = await checkProxy(proxy, timeout);
+      const result = await checkProxy(proxy, timeout, PROBES);
       checked++;
       breaker.recordSuccess();
 
@@ -202,6 +215,7 @@ async function poolCheck(proxies, concurrency, timeout, limit) {
         proxy.anonymity = result.anonymity || null;
         if (working.length < limit) {
           working.push(proxy);
+          checkNotify(proxy, CFG.notify);
           if (!QUIET) {
             const latencyColor =
               result.latency < 1000 ? C.green : result.latency < 3000 ? C.yellow : C.red;
@@ -328,6 +342,14 @@ async function main() {
   if (finalWorking.length === 0) {
     log(` ${C.yellow("No working proxies found. Try increasing --timeout or running again later.")}`);
     process.exit(1);
+  }
+
+  // Rotating proxy mode
+  if (opts.serve) {
+    log(` ${C.green("Proxy rotation mode")}`);
+    log(` ${C.dim("Starting rotating proxy server...")}`);
+    await startRotatingProxy(finalWorking, opts.servePort);
+    return; // Keep running until SIGINT
   }
 
   // Output

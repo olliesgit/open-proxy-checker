@@ -4,9 +4,20 @@ import https from "node:https";
 /**
  * Validation endpoint fallback chain.
  * Tries multiple endpoints via the proxy; sequentially falls back on failure.
+ *
+ * Default probes (hardcoded) can be overridden via proxy-checker.yaml:
+ *
+ *   validation:
+ *     probes:
+ *       - url: "http://httpbin.org/ip"
+ *         expect: "origin"
+ *       - url: "http://icanhazip.com"
+ *       - url: "http://google.com/generate_204"
+ *         expect_status: 204
+ *     check_timeout_ms: 5000
  */
 
-const ENDPOINTS = [
+const DEFAULT_ENDPOINTS = [
   {
     name: "httpbin",
     url: "http://httpbin.org/ip",
@@ -37,11 +48,47 @@ const ENDPOINTS = [
 
 const LEAK_HEADERS = ["forwarded", "x-forwarded-for", "via", "x-real-ip"];
 
-export async function checkProxy(proxy, timeout = 5000) {
+/**
+ * Build probe endpoints from config or use defaults.
+ * Config format:
+ *   probes:
+ *     - url: "http://httpbin.org/ip"
+ *       expect: "origin"           # string to find in body
+ *       expect_status: 200          # expected status code (default 200)
+ */
+export function buildProbes(configProbes) {
+  if (!configProbes || !configProbes.length) return DEFAULT_ENDPOINTS;
+  return configProbes.map((p, i) => {
+    const url = new URL(p.url);
+    const name = p.name || `${url.hostname}:${url.port || 80}`;
+    const expectStatus = p.expect_status ?? 200;
+    const expectBody = p.expect || null;
+    return {
+      name,
+      url: p.url,
+      headers: p.headers || {},
+      validate(body, status) {
+        if (status !== expectStatus) return false;
+        if (expectBody && !body.includes(expectBody)) return false;
+        return true;
+      },
+      extractIp(body) {
+        try {
+          if (url.hostname === "icanhazip.com") return body.trim();
+          const parsed = JSON.parse(body);
+          return parsed.origin || parsed.ip || null;
+        } catch { return null; }
+      },
+    };
+  });
+}
+
+export async function checkProxy(proxy, timeout = 5000, probes) {
+  const endpoints = probes || DEFAULT_ENDPOINTS;
   const start = Date.now();
   let lastHeaders = {};
   let lastBody = "";
-  for (const ep of ENDPOINTS) {
+  for (const ep of endpoints) {
     const remaining = timeout - (Date.now() - start);
     if (remaining <= 200) break;
     try {

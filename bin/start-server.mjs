@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { parseIpPortList, parseProtocolList } from "../src/parsers.mjs";
 import { SOURCE_REGISTRY } from "../src/sources.mjs";
 import { checkProxy } from "../src/check-chain.mjs";
+import { buildProbes } from "../src/check-chain.mjs";
 import { smartDedup } from "../src/smart-sources.mjs";
 import { createCircuitBreaker } from "../src/pool.mjs";
 import { loadProxyCache, resultsToCache, saveProxyCache, CACHE_TTL } from "../src/cache.mjs";
@@ -35,6 +36,7 @@ const PORT = Math.max(1, Math.min(65535, parseInt(USER_PORT || String(DEFAULT_PO
 const CONFIG = {
   DEFAULT_CHECK_TIMEOUT: CFG.validation?.check_timeout_ms || 5000,
   DEFAULT_CONCURRENCY: CFG.concurrency || 50,
+  PROBES: buildProbes(CFG.validation?.probes),
 };
 
 function logError(context, err) {
@@ -139,7 +141,7 @@ async function handleScan(req, res) {
       while (index < toCheck.length) {
         const i = index++;
         const proxy = toCheck[i];
-        const result = await checkProxy(proxy, CONFIG.DEFAULT_CHECK_TIMEOUT);
+        const result = await checkProxy(proxy, CONFIG.DEFAULT_CHECK_TIMEOUT, CONFIG.PROBES);
         checked++;
 
         if (result.alive) {
