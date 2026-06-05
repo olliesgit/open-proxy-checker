@@ -1,0 +1,27 @@
+{
+  "name": "open-proxy-checker",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Local CLI and web UI for collecting, deduplicating, validating, and exporting working proxy lists.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start:server": "node bin/start-server.mjs",
+    "start:cli": "node bin/start-cli.mjs",
+    "dev:server": "npm run start:server -- --port 3000",
+    "dev:cli": "npm run start:cli",
+    "test": "node --test",
+    "smoke": "node scripts/smoke-test.mjs",
+    "ci": "npm test && npm run smoke"
+  },
+  "bin": {
+    "proxy-checker": "./bin/start-cli.mjs",
+    "proxy-checker-server": "./bin/start-server.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0"
+  }
+}
